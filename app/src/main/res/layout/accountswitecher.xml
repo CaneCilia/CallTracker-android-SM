@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/accountSwitcherLayout"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:gravity="center"
+    android:padding="16dp">
+
+    <!-- Admin Circle -->
+    <FrameLayout
+        android:id="@+id/adminContainer"
+        android:layout_width="64dp"
+        android:layout_height="64dp"
+        android:layout_marginEnd="16dp">
+
+        <ImageView
+            android:id="@+id/adminIcon"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:src="@drawable/ic_admin"
+            android:contentDescription="Admin"
+            android:scaleType="centerCrop"
+            android:background="@drawable/circle_background_unselected"
+            android:padding="8dp"/>
+
+        <!-- Optional selection border -->
+        <View
+            android:id="@+id/adminSelectedBorder"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@drawable/circle_background_selected"
+            android:visibility="gone"/>
+    </FrameLayout>
+
+    <!-- User Circle -->
+    <FrameLayout
+        android:id="@+id/userContainer"
+        android:layout_width="64dp"
+        android:layout_height="64dp">
+
+        <ImageView
+            android:id="@+id/userIcon"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:src="@drawable/ic_user"
+            android:contentDescription="User"
+            android:scaleType="centerCrop"
+            android:background="@drawable/circle_background_unselected"
+            android:padding="8dp"/>
+
+        <!-- Optional selection border -->
+        <View
+            android:id="@+id/userSelectedBorder"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@drawable/circle_background_selected"
+            android:visibility="gone"/>
+    </FrameLayout>
+
+</LinearLayout>
