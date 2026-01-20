@@ -429,52 +429,113 @@ fun WeeklyActivityChart(callLogs: List<CallLogItem>) {
 
 @Composable
 fun LeadStatusDistributionChart(callLogs: List<CallLogItem>) {
+    val totalLogs = callLogs.size.coerceAtLeast(1)
     val leadStatusData = callLogs.groupBy { it.leadStatus }.mapValues { it.value.size }
 
-    val pieEntries = LeadStatus.values().map {
-        PieEntry(leadStatusData[it]?.toFloat() ?: 0f, it.status)
+    // Define the specific statuses and their colors
+    val targetStatuses = listOf(
+        LeadStatus.INTERESTED to Color(0xFF66BB6A),
+        LeadStatus.FOLLOW_UP to Color(0xFFFFA726),
+        LeadStatus.WRONG_NUMBER to Color(0xFFEF5350),
+        LeadStatus.NONE to Color(0xFF78909C)
+    )
+
+    // Calculate the "Top Performer" for the tagline
+    val topStatus = targetStatuses.maxByOrNull { leadStatusData[it.first] ?: 0 }
+
+    val barEntries = targetStatuses.mapIndexed { index, (status, _) ->
+        BarEntry(index.toFloat(), (leadStatusData[status] ?: 0).toFloat())
     }
 
-    val pieDataSet = PieDataSet(pieEntries, "").apply {
-        colors = listOf(
-            Color(0xFF66BB6A).toArgb(),
-            Color(0xFFEF5350).toArgb(),
-            Color(0xFFFFA726).toArgb(),
-            Color(0xFF78909C).toArgb()
-        )
-        valueTextColor = Color.Black.toArgb()
-        valueTextSize = 12f
+    val barDataSet = BarDataSet(barEntries, "").apply {
+        colors = targetStatuses.map { it.second.toArgb() }
+        valueTextSize = 11f
+        valueTextColor = MaterialTheme.colorScheme.onSurface.toArgb()
+        // Comparison Formatter: Shows "Count | Percentage%"
+        valueFormatter = object : com.github.mikephil.charting.formatter.ValueFormatter() {
+            override fun getFormattedValue(value: Float): String {
+                val percentage = (value / totalLogs) * 100
+                return "${value.toInt()} | ${String.format("%.0f", percentage)}%"
+            }
+        }
     }
 
-    val pieData = PieData(pieDataSet)
+    val labels = targetStatuses.map { it.first.status }
 
-    Card(modifier = Modifier.fillMaxWidth(), elevation = CardDefaults.cardElevation(4.dp)) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        elevation = CardDefaults.cardElevation(4.dp)
+    ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Text(text = "Lead Status Distribution", style = MaterialTheme.typography.headlineSmall)
+            Text(
+                text = "Lead Status Distribution",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+
+            AndroidView(
+                factory = { context ->
+                    com.github.mikephil.charting.charts.HorizontalBarChart(context).apply {
+                        layoutParams = ViewGroup.LayoutParams(
+                            ViewGroup.LayoutParams.MATCH_PARENT,
+                            550
+                        )
+                        data = BarData(barDataSet).apply { barWidth = 0.5f }
+
+                        description.isEnabled = false
+                        legend.isEnabled = false
+                        setDrawGridBackground(false)
+                        setFitBars(true)
+
+                        xAxis.apply {
+                            position = XAxis.XAxisPosition.BOTTOM
+                            setDrawGridLines(false)
+                            setDrawAxisLine(false)
+                            valueFormatter = IndexAxisValueFormatter(labels)
+                            granularity = 1f
+                            labelCount = labels.size
+                            textColor = Color.Gray.toArgb()
+                        }
+
+                        axisLeft.isEnabled = false
+                        axisRight.apply {
+                            isEnabled = false
+                            axisMinimum = 0f // Start from zero
+                        }
+
+                        setScaleEnabled(false)
+                        animateY(1000)
+                    }
+                },
+                modifier = Modifier.fillMaxWidth().height(220.dp)
+            )
+
+            // --- The Result Tagline Section ---
             Spacer(modifier = Modifier.height(16.dp))
-            AndroidView(factory = { context ->
-                PieChart(context).apply {
-                    layoutParams = ViewGroup.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT,
-                        500
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(
+                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        MaterialTheme.shapes.small
                     )
-                    data = pieData
-                    description.isEnabled = false
-                    setUsePercentValues(true)
-                    isDrawHoleEnabled = true
-                    holeRadius = 58f
-                    transparentCircleRadius = 61f
-                    setDrawCenterText(true)
-                    centerText = "Lead Status"
-                    setCenterTextSize(16f)
-                    legend.isEnabled = false
-                    animateY(1400)
-                }
-            }, modifier = Modifier.height(200.dp))
+                    .padding(12.dp)
+            ) {
+                val statusName = topStatus?.first?.status ?: "N/A"
+                val count = leadStatusData[topStatus?.first] ?: 0
+                val percent = (count.toFloat() / totalLogs * 100).toInt()
+
+                Text(
+                    text = "Summary: $statusName is your most frequent status, representing $percent% of total tracked activity.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontWeight = FontWeight.Medium
+                )
+            }
         }
     }
 }
-
 
 @Composable
 fun DurationDistributionChart(callLogs: List<CallLogItem>) {

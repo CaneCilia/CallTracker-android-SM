@@ -1,6 +1,7 @@
 {
   "project_info": {
     "project_number": "759646636534",
+    "firebase_url": "https://calltracker-9865b-default-rtdb.firebaseio.com",
     "project_id": "calltracker-9865b",
     "storage_bucket": "calltracker-9865b.firebasestorage.app"
   },
