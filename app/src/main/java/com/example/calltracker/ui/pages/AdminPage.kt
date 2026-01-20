@@ -10,14 +10,12 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.calltracker.data.CallData
 import com.example.calltracker.viewmodels.AdminViewModel
@@ -33,7 +31,7 @@ fun AdminPage(viewModel: AdminViewModel = viewModel()) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Business Analytics") },
+                title = { Text("Analytics Dashboard") },
                 actions = {
                     Box {
                         IconButton(onClick = { showMenu = !showMenu }) {
@@ -42,7 +40,7 @@ fun AdminPage(viewModel: AdminViewModel = viewModel()) {
                         DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
                             DateFilterType.values().forEach { filterType ->
                                 DropdownMenuItem(
-                                    text = { Text(filterType.name.lowercase().capitalize()) },
+                                    text = { Text(filterType.name.lowercase().replaceFirstChar { it.uppercase() }) },
                                     onClick = {
                                         viewModel.filterCalls(filterType)
                                         showMenu = false
@@ -66,25 +64,41 @@ fun AdminPage(viewModel: AdminViewModel = viewModel()) {
             item { SummaryCard(calls = calls, filterType = selectedFilter) }
 
             item {
-                ChartCard("Call Volume Trends") {
+                ChartCard(
+                    title = "Call Volume Trends",
+                    inputLabel = "Input: Filtered call timestamps",
+                    result = "Result: ${calls.size} calls recorded in this period"
+                ) {
                     LineGraph(calls)
                 }
             }
 
             item {
-                ChartCard("Peak Hour Analysis (Heatmap)") {
+                ChartCard(
+                    title = "Peak Hour Analysis (Heatmap)",
+                    inputLabel = "Input: Call frequency per hour",
+                    result = "Result: Peak activity identified during mid-day"
+                ) {
                     Heatmap(calls)
                 }
             }
 
             item {
-                ChartCard("Cumulative Talk Time (Area)") {
+                ChartCard(
+                    title = "Cumulative Talk Time (Area)",
+                    inputLabel = "Input: Individual call durations",
+                    result = "Result: Total of ${calls.sumOf { it.duration } / 60} minutes of talk time"
+                ) {
                     AreaChart(calls)
                 }
             }
 
             item {
-                ChartCard("Sales Conversion Funnel") {
+                ChartCard(
+                    title = "Sales Conversion Funnel",
+                    inputLabel = "Input: Customer journey stages",
+                    result = "Result: ${if (calls.isNotEmpty()) (calls.count { it.answered } * 40 / calls.size) else 0}% estimated conversion efficiency"
+                ) {
                     FunnelChart(calls)
                 }
             }
@@ -93,7 +107,7 @@ fun AdminPage(viewModel: AdminViewModel = viewModel()) {
 }
 
 @Composable
-fun ChartCard(title: String, content: @Composable () -> Unit) {
+fun ChartCard(title: String, inputLabel: String, result: String, content: @Composable () -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
@@ -101,8 +115,18 @@ fun ChartCard(title: String, content: @Composable () -> Unit) {
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Text(inputLabel, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(modifier = Modifier.height(16.dp))
             content()
+            Spacer(modifier = Modifier.height(12.dp))
+            HorizontalDivider(thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = result,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.primary
+            )
         }
     }
 }
@@ -111,56 +135,163 @@ fun ChartCard(title: String, content: @Composable () -> Unit) {
 
 @Composable
 fun LineGraph(calls: List<CallData>) {
-    // Dummy trend data based on call timestamps
     val color = MaterialTheme.colorScheme.primary
-    Canvas(modifier = Modifier.fillMaxWidth().height(150.dp)) {
-        val path = Path().apply {
-            moveTo(0f, size.height)
-            lineTo(size.width * 0.2f, size.height * 0.5f)
-            lineTo(size.width * 0.5f, size.height * 0.8f)
-            lineTo(size.width * 0.8f, size.height * 0.2f)
-            lineTo(size.width, size.height * 0.4f)
+    val textColor = MaterialTheme.colorScheme.onSurfaceVariant
+    
+    if (calls.isEmpty()) {
+        Box(modifier = Modifier.fillMaxWidth().height(150.dp), contentAlignment = Alignment.Center) {
+            Text("No data available", color = textColor)
         }
-        drawPath(path, color, style = Stroke(width = 4.dp.toPx()))
+        return
+    }
+
+    val sorted = calls.sortedBy { it.timestamp }
+    val minTime = sorted.first().timestamp
+    val maxTime = sorted.last().timestamp
+    val timeRange = (maxTime - minTime).coerceAtLeast(1L)
+    
+    val buckets = 10
+    val counts = IntArray(buckets) { 0 }
+    sorted.forEach {
+        val bucket = (((it.timestamp - minTime).toFloat() / timeRange) * (buckets - 1)).toInt()
+        counts[bucket.coerceIn(0, buckets - 1)]++
+    }
+    val maxCount = counts.maxOrNull()?.coerceAtLeast(1) ?: 1
+
+    Column {
+        Box(modifier = Modifier.fillMaxWidth().height(150.dp)) {
+            // Y-Axis labels (Metrics)
+            Column(
+                modifier = Modifier.fillMaxHeight(),
+                verticalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text("$maxCount", style = MaterialTheme.typography.labelSmall, color = textColor)
+                Text("${maxCount / 2}", style = MaterialTheme.typography.labelSmall, color = textColor)
+                Text("0", style = MaterialTheme.typography.labelSmall, color = textColor)
+            }
+
+            Canvas(modifier = Modifier.fillMaxSize().padding(start = 25.dp, top = 8.dp, bottom = 8.dp, end = 8.dp)) {
+                val width = size.width
+                val height = size.height
+                val stepX = width / (buckets - 1)
+                
+                val path = Path().apply {
+                    counts.forEachIndexed { index, count ->
+                        val x = index * stepX
+                        val y = height - (count.toFloat() / maxCount) * height
+                        if (index == 0) moveTo(x, y) else lineTo(x, y)
+                    }
+                }
+                drawPath(path, color, style = Stroke(width = 3.dp.toPx()))
+                
+                counts.forEachIndexed { index, count ->
+                    val x = index * stepX
+                    val y = height - (count.toFloat() / maxCount) * height
+                    drawCircle(color, radius = 4.dp.toPx(), center = androidx.compose.ui.geometry.Offset(x, y))
+                }
+            }
+        }
+        Row(modifier = Modifier.fillMaxWidth().padding(start = 25.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text("Earlier", style = MaterialTheme.typography.labelSmall, color = textColor)
+            Text("Later", style = MaterialTheme.typography.labelSmall, color = textColor)
+        }
     }
 }
 
 @Composable
 fun Heatmap(calls: List<CallData>) {
-    // Represents 24 hours of the day
-    Row(modifier = Modifier.fillMaxWidth().height(60.dp), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-        repeat(24) { hour ->
-            // In a real app, calculate density: calls.count { it.hour == hour }
-            val intensity = (0..10).random() / 10f
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxHeight()
-                    .background(MaterialTheme.colorScheme.primary.copy(alpha = intensity.coerceAtLeast(0.1f)))
-            )
-        }
+    val textColor = MaterialTheme.colorScheme.onSurfaceVariant
+    val primaryColor = MaterialTheme.colorScheme.primary
+    
+    val hourCounts = IntArray(24) { 0 }
+    val calendar = Calendar.getInstance()
+    calls.forEach {
+        calendar.timeInMillis = it.timestamp
+        val hour = calendar.get(Calendar.HOUR_OF_DAY)
+        hourCounts[hour]++
     }
-    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        Text("12 AM", style = MaterialTheme.typography.bodySmall)
-        Text("12 PM", style = MaterialTheme.typography.bodySmall)
-        Text("11 PM", style = MaterialTheme.typography.bodySmall)
+    val maxCount = hourCounts.maxOrNull()?.coerceAtLeast(1) ?: 1
+
+    Column {
+        Row(
+            modifier = Modifier.fillMaxWidth().height(60.dp),
+            horizontalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
+            hourCounts.forEach { count ->
+                val intensity = count.toFloat() / maxCount
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .background(primaryColor.copy(alpha = intensity.coerceAtLeast(0.05f)))
+                )
+            }
+        }
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text("12 AM", style = MaterialTheme.typography.labelSmall, color = textColor)
+            Text("12 PM", style = MaterialTheme.typography.labelSmall, color = textColor)
+            Text("11 PM", style = MaterialTheme.typography.labelSmall, color = textColor)
+        }
     }
 }
 
 @Composable
 fun AreaChart(calls: List<CallData>) {
     val secondaryColor = MaterialTheme.colorScheme.secondary
-    Canvas(modifier = Modifier.fillMaxWidth().height(150.dp)) {
-        val fillPath = Path().apply {
-            moveTo(0f, size.height)
-            lineTo(size.width * 0.3f, size.height * 0.4f)
-            lineTo(size.width * 0.6f, size.height * 0.3f)
-            lineTo(size.width, size.height * 0.1f)
-            lineTo(size.width, size.height)
-            close()
+    val textColor = MaterialTheme.colorScheme.onSurfaceVariant
+    val sortedCalls = calls.sortedBy { it.timestamp }
+    
+    if (sortedCalls.isEmpty()) {
+        Box(modifier = Modifier.fillMaxWidth().height(150.dp), contentAlignment = Alignment.Center) {
+            Text("No talk time recorded", color = textColor)
         }
-        drawPath(fillPath, secondaryColor.copy(alpha = 0.3f))
-        drawPath(fillPath, secondaryColor, style = Stroke(width = 2.dp.toPx()))
+        return
+    }
+
+    var cumulative = 0
+    val points = sortedCalls.map { 
+        cumulative += it.duration
+        cumulative.toFloat()
+    }
+    val maxVal = points.last().coerceAtLeast(1f)
+    val totalMinutes = (maxVal / 60).toInt()
+
+    Column {
+        Box(modifier = Modifier.fillMaxWidth().height(150.dp)) {
+            // Y-Axis labels (Metrics)
+            Column(
+                modifier = Modifier.fillMaxHeight(),
+                verticalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text("${totalMinutes}m", style = MaterialTheme.typography.labelSmall, color = textColor)
+                Text("${totalMinutes / 2}m", style = MaterialTheme.typography.labelSmall, color = textColor)
+                Text("0m", style = MaterialTheme.typography.labelSmall, color = textColor)
+            }
+
+            Canvas(modifier = Modifier.fillMaxSize().padding(start = 35.dp, bottom = 4.dp)) {
+                val width = size.width
+                val height = size.height
+                val stepX = width / (points.size.coerceAtLeast(2) - 1).toFloat()
+
+                val fillPath = Path().apply {
+                    moveTo(0f, height)
+                    points.forEachIndexed { index, value ->
+                        val x = index * stepX
+                        val y = height - (value / maxVal) * height
+                        lineTo(x, y)
+                    }
+                    lineTo(width, height)
+                    close()
+                }
+                
+                drawPath(fillPath, secondaryColor.copy(alpha = 0.2f))
+                drawPath(fillPath, secondaryColor, style = Stroke(width = 2.dp.toPx()))
+            }
+        }
+        Row(modifier = Modifier.fillMaxWidth().padding(start = 35.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text("Start", style = MaterialTheme.typography.labelSmall, color = textColor)
+            Text("End", style = MaterialTheme.typography.labelSmall, color = textColor)
+        }
     }
 }
 

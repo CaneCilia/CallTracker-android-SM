@@ -333,6 +333,28 @@ fun CallTypeBreakdown(analytics: AnalyticsData) {
                     animateY(1400)
                 }
             }, modifier = Modifier.height(200.dp))
+
+            // Summary Section
+            Spacer(modifier = Modifier.height(16.dp))
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f), MaterialTheme.shapes.small)
+                    .padding(12.dp)
+            ) {
+                val mostFrequent = listOf(
+                    "Incoming" to analytics.incomingCount,
+                    "Outgoing" to analytics.outgoingCount,
+                    "Missed" to analytics.missedCount,
+                    "Rejected" to analytics.rejectedCount
+                ).maxByOrNull { it.second }
+
+                Text(
+                    text = "Summary: ${mostFrequent?.first} calls are the most frequent, making up ${if (analytics.totalCalls > 0) (mostFrequent?.second?.times(100) ?: 0) / analytics.totalCalls else 0}% of activity.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
     }
 }
@@ -377,6 +399,22 @@ fun HourlyActivityChart(callLogs: List<CallLogItem>) {
                     animateY(1400)
                 }
             }, modifier = Modifier.height(200.dp))
+
+            // Summary Section
+            Spacer(modifier = Modifier.height(16.dp))
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f), MaterialTheme.shapes.small)
+                    .padding(12.dp)
+            ) {
+                val peakHour = (0..23).maxByOrNull { hourlyData[it] ?: 0 } ?: 0
+                Text(
+                    text = "Summary: Peak activity occurs at ${String.format("%02d:00", peakHour)} with ${hourlyData[peakHour] ?: 0} calls recorded.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
     }
 }
@@ -423,6 +461,23 @@ fun WeeklyActivityChart(callLogs: List<CallLogItem>) {
                     animateY(1400)
                 }
             }, modifier = Modifier.height(200.dp))
+
+            // Summary Section
+            Spacer(modifier = Modifier.height(16.dp))
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f), MaterialTheme.shapes.small)
+                    .padding(12.dp)
+            ) {
+                val peakDayIndex = (1..7).maxByOrNull { weeklyData[it] ?: 0 } ?: 1
+                val peakDay = labels[peakDayIndex - 1]
+                Text(
+                    text = "Summary: $peakDay is your busiest day with ${weeklyData[peakDayIndex] ?: 0} total calls.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
     }
 }
@@ -586,6 +641,22 @@ fun DurationDistributionChart(callLogs: List<CallLogItem>) {
                     animateY(1400)
                 }
             }, modifier = Modifier.height(200.dp))
+
+            // Summary Section
+            Spacer(modifier = Modifier.height(16.dp))
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f), MaterialTheme.shapes.small)
+                    .padding(12.dp)
+            ) {
+                val mostCommon = durationCategories.maxByOrNull { it.value }?.key ?: "N/A"
+                Text(
+                    text = "Summary: Most calls fall into the $mostCommon duration category.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
     }
 }
