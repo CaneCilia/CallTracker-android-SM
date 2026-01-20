@@ -26,24 +26,44 @@ class AdminViewModel : ViewModel() {
     private val _filteredCalls = mutableStateOf(allCalls)
     val filteredCalls: State<List<CallData>> = _filteredCalls
 
+    private val _selectedFilter = mutableStateOf(DateFilterType.CUSTOM)
+    val selectedFilter: State<DateFilterType> = _selectedFilter
+
     fun filterCalls(filterType: DateFilterType) {
+        _selectedFilter.value = filterType
+        if (filterType == DateFilterType.CUSTOM) {
+            _filteredCalls.value = allCalls
+            return
+        }
+
         val calendar = Calendar.getInstance()
         val now = System.currentTimeMillis()
         val startOfPeriod = when (filterType) {
             DateFilterType.TODAY -> {
-                calendar.add(Calendar.DAY_OF_YEAR, 0)
                 calendar.set(Calendar.HOUR_OF_DAY, 0)
+                calendar.set(Calendar.MINUTE, 0)
+                calendar.set(Calendar.SECOND, 0)
+                calendar.set(Calendar.MILLISECOND, 0)
                 calendar.timeInMillis
             }
             DateFilterType.THIS_WEEK -> {
                 calendar.set(Calendar.DAY_OF_WEEK, calendar.firstDayOfWeek)
+                calendar.set(Calendar.HOUR_OF_DAY, 0)
+                calendar.set(Calendar.MINUTE, 0)
+                calendar.set(Calendar.SECOND, 0)
+                calendar.set(Calendar.MILLISECOND, 0)
                 calendar.timeInMillis
             }
 
             DateFilterType.THIS_MONTH -> {
                 calendar.set(Calendar.DAY_OF_MONTH, 1)
+                calendar.set(Calendar.HOUR_OF_DAY, 0)
+                calendar.set(Calendar.MINUTE, 0)
+                calendar.set(Calendar.SECOND, 0)
+                calendar.set(Calendar.MILLISECOND, 0)
                 calendar.timeInMillis
             }
+            DateFilterType.CUSTOM -> 0L // Should not be reached
         }
         _filteredCalls.value = allCalls.filter { it.timestamp >= startOfPeriod && it.timestamp <= now }
     }
