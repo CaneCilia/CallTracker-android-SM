@@ -3,6 +3,7 @@ package com.example.calltracker.ui.pages
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.util.Log
 import android.widget.Toast
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Spring
@@ -54,6 +55,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -67,6 +69,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.google.firebase.auth.ktx.auth
+import com.google.firebase.firestore.ktx.firestore
+import com.google.firebase.ktx.Firebase
 
 @Composable
 fun HomeScreenContent(
@@ -77,7 +82,24 @@ fun HomeScreenContent(
     isSyncing: Boolean,
     onSyncClick: () -> Unit
 ) {
-    val stats = calculateStats(callLogs)
+    // Local state to manage the logs with their fetched statuses
+    var displayedLogs by remember(callLogs) { mutableStateOf(callLogs) }
+    var isFetching by remember { mutableStateOf(false) }
+
+    // Fetch lead statuses from Firestore when logs are loaded
+    LaunchedEffect(callLogs) {
+        if (callLogs.isNotEmpty()) {
+            isFetching = true
+            fetchLeadStatuses(callLogs) {
+                // Create a new list reference to trigger recomposition
+                displayedLogs = callLogs.toList()
+                isFetching = false
+            }
+        }
+    }
+
+    val stats = calculateStats(displayedLogs)
+    
     when {
         isLoading -> LoadingView()
         !hasPermission -> PermissionView(padding)
@@ -91,7 +113,13 @@ fun HomeScreenContent(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("Home", style = MaterialTheme.typography.headlineSmall)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("Home", style = MaterialTheme.typography.headlineSmall)
+                        if (isFetching) {
+                            Spacer(modifier = Modifier.width(8.dp))
+                            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                        }
+                    }
                     SyncButton(onClick = onSyncClick, isSyncing = isSyncing)
                 }
 
@@ -102,13 +130,48 @@ fun HomeScreenContent(
                 ) {
                     item { StatsSection(stats) }
 
-                    items(callLogs) { call ->
-                        CallLogCard(call)
+                    items(displayedLogs) { call ->
+                        CallLogCard(
+                            log = call,
+                            onUpdate = {
+                                displayedLogs = displayedLogs.toList()
+                            }
+                        )
                     }
                 }
             }
         }
     }
+}
+
+private fun fetchLeadStatuses(logs: List<CallLogItem>, onComplete: () -> Unit) {
+    val user = Firebase.auth.currentUser ?: return
+    val db = Firebase.firestore
+    
+    db.collection("users")
+        .document(user.uid)
+        .collection("phoneStatus")
+        .get()
+        .addOnSuccessListener { querySnapshot ->
+            val statusMap = querySnapshot.documents.associate { 
+                it.id to it.getString("status") 
+            }
+            
+            logs.forEach { log ->
+                val statusName = statusMap[log.number]
+                if (statusName != null) {
+                    try {
+                        log.leadStatus = LeadStatus.valueOf(statusName)
+                    } catch (e: Exception) {
+                        Log.e("FIRESTORE", "Invalid status: $statusName")
+                    }
+                }
+            }
+            onComplete()
+        }
+        .addOnFailureListener {
+            onComplete()
+        }
 }
 
 @Composable
@@ -166,7 +229,7 @@ fun StatMetric(title: String, value: String, icon: ImageVector) {
 }
 
 @Composable
-fun CallLogCard(log: CallLogItem) {
+fun CallLogCard(log: CallLogItem, onUpdate: () -> Unit) {
     var showDialog by remember { mutableStateOf(false) }
     val context = LocalContext.current
 
@@ -175,6 +238,8 @@ fun CallLogCard(log: CallLogItem) {
             onDismiss = { showDialog = false },
             onAddTag = { tag ->
                 log.tags.add(tag)
+                updateFirestoreCallLog(log)
+                onUpdate()
                 showDialog = false
             }
         )
@@ -251,10 +316,61 @@ fun CallLogCard(log: CallLogItem) {
 
                 LeadStatusTracker(log) { newStatus ->
                     log.leadStatus = newStatus
+                    updateFirestoreCallLog(log)
+                    // Update global lead status for this phone number
+                    updateGlobalPhoneNumberStatus(log.number, newStatus)
+                    onUpdate()
                 }
             }
         }
     }
+}
+
+private fun updateFirestoreCallLog(log: CallLogItem) {
+    val user = Firebase.auth.currentUser ?: return
+    val db = Firebase.firestore
+    
+    db.collection("users")
+        .document(user.uid)
+        .collection("calldata")
+        .whereEqualTo("number", log.number)
+        .whereEqualTo("dateTime", log.dateTime)
+        .get()
+        .addOnSuccessListener { querySnapshot ->
+            for (document in querySnapshot.documents) {
+                document.reference.update(
+                    "leadStatus", log.leadStatus.name,
+                    "tags", log.tags
+                ).addOnSuccessListener {
+                    Log.d("FIRESTORE", "Successfully updated lead status/tags")
+                }.addOnFailureListener { e ->
+                    Log.e("FIRESTORE", "Error updating document", e)
+                }
+            }
+        }
+        .addOnFailureListener { e ->
+            Log.e("FIRESTORE", "Error finding document", e)
+        }
+}
+
+private fun updateGlobalPhoneNumberStatus(number: String?, status: LeadStatus) {
+    if (number.isNullOrBlank()) return
+    val user = Firebase.auth.currentUser ?: return
+    val db = Firebase.firestore
+    
+    val data = hashMapOf(
+        "status" to status.name,
+        "updatedAt" to com.google.firebase.Timestamp.now()
+    )
+    
+    db.collection("users")
+        .document(user.uid)
+        .collection("phoneStatus")
+        .document(number)
+        .set(data)
+        .addOnSuccessListener {
+            Log.d("FIRESTORE", "Global phone status updated for $number")
+        }
 }
 
 @Composable
