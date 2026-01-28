@@ -30,7 +30,10 @@ import java.util.Date
 import java.util.Locale
 
 @Composable
-fun SettingsScreen(settingsViewModel: SettingsViewModel = viewModel()) {
+fun SettingsScreen(
+    settingsViewModel: SettingsViewModel = viewModel(),
+    onLogout: () -> Unit
+) {
     val userData by settingsViewModel.userData.collectAsState()
 
     Column(
@@ -43,10 +46,14 @@ fun SettingsScreen(settingsViewModel: SettingsViewModel = viewModel()) {
         SyncStatusCard()
         Spacer(modifier = Modifier.height(16.dp))
         Button(
-            onClick = { settingsViewModel.logout() },
+            onClick = { 
+                settingsViewModel.logout()
+                onLogout()
+            },
             modifier = Modifier.fillMaxWidth()
         ) {
             Icon(Icons.Default.ExitToApp, contentDescription = "Log out")
+            Spacer(modifier = Modifier.padding(horizontal = 4.dp))
             Text("Log out")
         }
     }

@@ -7,9 +7,6 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -26,6 +23,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.navigation.NavController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -36,7 +34,7 @@ import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
-fun UserPage() {
+fun UserPage(rootNavController: NavController) {
     val navController = rememberNavController()
 
     val context = LocalContext.current
@@ -80,15 +78,24 @@ fun UserPage() {
             NavigationBar(
                 containerColor = MaterialTheme.colorScheme.surfaceContainer
             ) {
+                // Using the BottomNavItem defined in DataModels.kt
                 val items = listOf(
-                    BottomNavItem.Home,                    BottomNavItem.Analytics,                    BottomNavItem.Settings
+                    BottomNavItem.Home,
+                    BottomNavItem.Analytics,
+                    BottomNavItem.Settings
                 )
                 items.forEach { screen ->
                     NavigationBarItem(
                         icon = { Icon(screen.icon, contentDescription = screen.title) },
                         label = { Text(screen.title) },
                         selected = navController.currentBackStackEntry?.destination?.route == screen.route,
-                        onClick = { navController.navigate(screen.route) }
+                        onClick = { 
+                            navController.navigate(screen.route) {
+                                popUpTo("home") { saveState = true }
+                                launchSingleTop = true
+                                restoreState = true
+                            }
+                        }
                     )
                 }
             }
@@ -124,7 +131,13 @@ fun UserPage() {
                 )
             }
             composable("analytics") { AnalyticsScreen(callLogs) }
-            composable("settings") { SettingsScreen() }
+            composable("settings") { 
+                SettingsScreen(onLogout = {
+                    rootNavController.navigate("switcher") {
+                        popUpTo(0)
+                    }
+                }) 
+            }
         }
     }
 }

@@ -1,6 +1,9 @@
 package com.example.calltracker
 
 import android.os.Bundle
+import android.view.LayoutInflater
+import android.widget.FrameLayout
+import android.widget.TextView
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -9,13 +12,13 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.AdminPanelSettings
 import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -23,6 +26,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.navigation.NavController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -32,8 +36,6 @@ import com.example.calltracker.ui.pages.AdminPage
 import com.example.calltracker.ui.pages.UserLoginPage
 import com.example.calltracker.ui.pages.UserPage
 import com.example.calltracker.ui.theme.CallTrackerTheme
-import com.google.firebase.auth.ktx.auth
-import com.google.firebase.ktx.Firebase
 
 class MainActivity : ComponentActivity() {
 
@@ -44,18 +46,6 @@ class MainActivity : ComponentActivity() {
         setContent {
             CallTrackerTheme {
                 val navController = rememberNavController()
-
-                // Auth state listener to handle logouts globally
-                LaunchedEffect(Unit) {
-                    Firebase.auth.addAuthStateListener { auth ->
-                        if (auth.currentUser == null) {
-                            // If user is logged out, clear backstack and go to switcher or login
-                            navController.navigate("switcher") {
-                                popUpTo(0) { inclusive = true }
-                            }
-                        }
-                    }
-                }
 
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
                     NavHost(
@@ -73,7 +63,7 @@ class MainActivity : ComponentActivity() {
                             )
                         }
                         composable("admin") { AdminPage() }
-                        composable("user") { UserPage() }
+                        composable("user") { UserPage(navController) }
                     }
                 }
             }
@@ -128,7 +118,7 @@ fun ActivityMainXml(navController: NavController) {
                 onClick = {
                     navController.navigate("admin_login")
                 },
-                isSelected = false
+                isSelected = false  // You can manage selection state here
             )
 
             Spacer(modifier = Modifier.height(16.dp))
