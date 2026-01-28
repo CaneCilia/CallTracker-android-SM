@@ -1,5 +1,6 @@
 package com.example.calltracker.ui.pages
 
+import android.util.Log
 import android.widget.Toast
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
@@ -12,7 +13,8 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
-import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.ktx.firestore
+import com.google.firebase.ktx.Firebase
 
 @Composable
 fun AdminLoginPage(navController: NavController) {
@@ -35,7 +37,7 @@ fun AdminLoginPage(navController: NavController) {
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.primary
         )
-        
+
         Spacer(modifier = Modifier.height(32.dp))
 
         OutlinedTextField(
@@ -46,9 +48,9 @@ fun AdminLoginPage(navController: NavController) {
             singleLine = true,
             enabled = !isLoading
         )
-        
+
         Spacer(modifier = Modifier.height(12.dp))
-        
+
         OutlinedTextField(
             value = password,
             onValueChange = { password = it },
@@ -58,31 +60,38 @@ fun AdminLoginPage(navController: NavController) {
             singleLine = true,
             enabled = !isLoading
         )
-        
+
         Spacer(modifier = Modifier.height(24.dp))
-        
+
         Button(
             onClick = {
-                if (username.isNotEmpty() && password.isNotEmpty()) {
+                val inputUser = username.trim()
+                val inputPass = password.trim()
+
+                if (inputUser.isNotEmpty() && inputPass.isNotEmpty()) {
                     isLoading = true
-                    val db = FirebaseFirestore.getInstance()
-                    
-                    // Manually check credentials in the "admins" collection
-                    db.collection("admins")
-                        .whereEqualTo("username", username)
-                        .whereEqualTo("password", password)
+                    val db = Firebase.firestore
+
+                    // Query the entire admincredits collection for matching credentials
+                    // This will check every document (admin, adminone, etc.)
+                    db.collection("admincredits")
+                        .whereEqualTo("username", inputUser)
+                        .whereEqualTo("password", inputPass)
                         .get()
-                        .addOnSuccessListener { documents ->
+                        .addOnSuccessListener { querySnapshot ->
                             isLoading = false
-                            if (!documents.isEmpty) {
-                                // Successfully found a matching admin document
+                            if (!querySnapshot.isEmpty) {
+                                // Successfully authenticated if any document matches
+                                Log.d("AdminLogin", "Login successful for: $inputUser")
                                 navController.navigate("admin")
                             } else {
+                                Log.d("AdminLogin", "No matching document found in admincredits")
                                 Toast.makeText(context, "Invalid Admin Credentials", Toast.LENGTH_SHORT).show()
                             }
                         }
                         .addOnFailureListener { e ->
                             isLoading = false
+                            Log.e("AdminLogin", "Firestore Error: ${e.message}")
                             Toast.makeText(context, "Login Error: ${e.message}", Toast.LENGTH_SHORT).show()
                         }
                 } else {
